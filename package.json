@@ -1,0 +1,43 @@
+{
+  "name": "@sandsoftwaresolutions/health",
+  "version": "0.1.0",
+  "description": "Live and ready health endpoints with timeouts, caching and degraded state, for Docker and load balancers.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "keywords": [
+    "health",
+    "readiness",
+    "liveness",
+    "docker"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SandSoftwareSolutions/ss-health.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SandSoftwareSolutions/ss-health/issues"
+  },
+  "homepage": "https://github.com/SandSoftwareSolutions/ss-health#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}
