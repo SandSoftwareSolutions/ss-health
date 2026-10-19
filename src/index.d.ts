@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-export type CheckFn = () => unknown | Promise<unknown>;
+/** Gets a signal that aborts when the check times out. */
+export type CheckFn = (signal: AbortSignal) => unknown | Promise<unknown>;
 export interface CheckSpec {
   check: CheckFn;
   /** Default: the global timeoutMs. */

@@ -44,8 +44,10 @@ createServer((req, res) => {
 - **ok / degraded / down.** A failing *critical* check (the default) makes the service `down` (HTTP 503). A failing non-critical one only makes it `degraded` (still HTTP 200), so a broken mail server does not get your app restarted.
 - **A check passes** when it returns without throwing and does not return `false`. It fails when it throws, returns `false`, or takes longer than its timeout.
 - **Caching.** Results are cached for `cacheMs` and simultaneous requests share one run, so a busy load balancer cannot hammer your database.
+- **A hung check is not piled up.** A check that is still running from an earlier probe is not called again: it is reported `down` ("the previous call of this check is still running") until it comes back. Otherwise every probe would add one more hung call to your database. Each check also gets an `AbortSignal` (`check(signal)`) that aborts when it times out, so a check can cancel its own work. Give a check its own timeout if it can hang for ever, because until it settles it stays `down`.
+- **Timeouts** must be a number above 0 (`RangeError` otherwise); a very large one is cut to 2^31-1 ms. A clock that steps back does not freeze the cache.
 - **Live is not ready.** `/live` never runs checks. If your database is slow, you want traffic held back (not ready) and not a restart (not live).
 - **No leaks.** Error messages are left out unless you set `verbose: true`, because they can contain addresses and passwords. Use `verbose` for private networks only.
-- Responses are `no-store`.
+- Responses are `no-store`. The check names, their status and timing are in the answer: put `/ready` where only your orchestrator can reach it, or name checks so that they reveal little. If the run itself breaks, `/ready` answers `503 {"status":"down"}`.
 
 Pairs well with `@sandsoftwaresolutions/graceful`: after shutdown starts, answer 503 on `/ready`.

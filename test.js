@@ -77,3 +77,82 @@ test("HTTP handlers: ready 200/503, live always 200", async () => {
 test("a check must be a function", () => {
   assert.throws(() => createHealth({ checks: { x: 5 } }), TypeError);
 });
+
+// ---- review additions ----
+
+const get = (port, path) => new Promise((resolve, reject) => {
+  const req = request({ host: "127.0.0.1", port, path }, (res) => {
+    let body = "";
+    res.on("data", (c) => (body += c));
+    res.on("end", () => resolve({ status: res.statusCode, body }));
+  });
+  req.setTimeout(2000, () => req.destroy(new Error("no answer within 2 s")));
+  req.on("error", reject).end();
+});
+
+test("a check that hangs is not started again while the earlier call is still running", async () => {
+  let calls = 0;
+  let release;
+  const health = createHealth({ checks: { db: () => { calls++; return calls === 1 ? new Promise((r) => (release = r)) : true; } }, timeoutMs: 20, cacheMs: 0, verbose: true });
+  const first = await health.run();
+  const second = await health.run();
+  const third = await health.run();
+  assert.equal(calls, 1, "every probe would add one more hung call to the database");
+  for (const report of [first, second, third]) assert.equal(report.status, "down");
+  assert.match(second.checks.db.error, /still running/);
+  release();
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal((await health.run()).status, "ok");
+  assert.equal(calls, 2);
+});
+
+test("a check gets a signal that aborts when it times out", async () => {
+  let received;
+  const health = createHealth({ checks: { db: (signal) => { received = signal; return new Promise(() => {}); } }, timeoutMs: 20 });
+  await health.run();
+  assert.ok(received instanceof AbortSignal);
+  assert.equal(received.aborted, true);
+});
+
+test("timeouts are checked: a huge one does not fire at once, nonsense is refused", async () => {
+  const slow = async () => { await new Promise((r) => setTimeout(r, 30)); };
+  assert.equal((await createHealth({ checks: { db: slow }, timeoutMs: 1e12 }).run()).status, "ok");
+  assert.equal((await createHealth({ checks: { db: { check: slow, timeoutMs: 1e12 } } }).run()).status, "ok");
+  for (const bad of [0, -1, NaN, "5"]) {
+    assert.throws(() => createHealth({ timeoutMs: bad }), RangeError, String(bad));
+    assert.throws(() => createHealth({ checks: { db: { check: slow, timeoutMs: bad } } }), RangeError, String(bad));
+  }
+  assert.throws(() => createHealth({ cacheMs: NaN }), RangeError);
+  assert.throws(() => createHealth({ cacheMs: -1 }), RangeError);
+  assert.throws(() => createHealth({ checks: { db: { check: slow, critical: "no" } } }), TypeError);
+});
+
+test("a clock that jumps back does not freeze the cache", async () => {
+  let t = 100_000, calls = 0;
+  const health = createHealth({ checks: { db: () => { calls++; } }, cacheMs: 500, now: () => t });
+  await health.run();
+  t = 0;
+  await health.run();
+  assert.equal(calls, 2);
+  assert.ok((await health.run()).checks.db.ms >= 0);
+});
+
+test("ready answers 503 instead of hanging when the run itself breaks", async () => {
+  const health = createHealth({ checks: { db: () => true }, now: () => { throw new Error("clock broke"); } });
+  const server = createServer((req, res) => health.ready(req, res)); // no .catch: like createServer(health.ready)
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const answer = await get(server.address().port, "/ready");
+  assert.equal(answer.status, 503);
+  assert.deepEqual(JSON.parse(answer.body), { status: "down" });
+  server.closeAllConnections();
+  await new Promise((r) => server.close(r));
+});
+
+test("a check called __proto__ is just a name", async () => {
+  const report = await createHealth({ checks: Object.fromEntries([["__proto__", () => true]]) }).run();
+  assert.equal(report.status, "ok");
+  assert.deepEqual(Object.keys(report.checks), ["__proto__"]);
+  assert.equal(Object.getPrototypeOf(report.checks), Object.prototype);
+  assert.equal({}.status, undefined);
+  assert.ok(JSON.stringify(report).includes('"__proto__":{"status":"up"'));
+});
