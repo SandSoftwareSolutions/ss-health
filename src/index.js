@@ -38,7 +38,6 @@ export function createHealth({ checks = {}, timeoutMs = 2000, cacheMs = 1000, ve
       let timer;
       const timedOut = new Promise((resolve) => {
         timer = setTimeout(resolve, def.timeoutMs, TIMED_OUT);
-        timer.unref?.();
       });
       def.inFlight = true;
       const call = Promise.resolve().then(() => def.check(controller.signal));

@@ -1,6 +1,6 @@
 {
   "name": "@sandsoftwaresolutions/health",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Live and ready health endpoints with timeouts, caching and degraded state, for Docker and load balancers.",
   "type": "module",
   "main": "./dist/index.cjs",
