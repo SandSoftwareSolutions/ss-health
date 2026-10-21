@@ -10,6 +10,8 @@ Health checks for a service, the way a load balancer, Docker or Kubernetes wants
 npm install @sandsoftwaresolutions/health
 ```
 
+Works with `import` and `require()`, and ships TypeScript types for both.
+
 ## Usage
 
 ```js
